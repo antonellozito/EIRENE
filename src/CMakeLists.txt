@@ -363,6 +363,22 @@ if( NOT src_user-routines/x )
   message(FATAL_ERROR "No user-routines named \"${EIRENE_USER-ROUTINES}\"")
 endif()
 
+# Suppress unused-dummy-argument warnings for stub (dummy) source directories.
+# These routines intentionally receive but ignore their arguments.
+if("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU" OR
+   "${CMAKE_Fortran_COMPILER_ID}" STREQUAL "G95")
+  set(_dummy_no_unused_flag "-Wno-unused-dummy-argument")
+elseif("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "Intel" OR
+       "${CMAKE_Fortran_COMPILER_ID}" STREQUAL "IntelLLVM")
+  set(_dummy_no_unused_flag "-warn nounused")
+endif()
+if(_dummy_no_unused_flag)
+  set_source_files_properties(
+    ${src_grsoft-dummy} ${src_plot_dummy} ${src_broadcast_dummy}
+    ${PROJECT_SOURCE_DIR}/modules/eirmod_mpi.F90
+    PROPERTIES COMPILE_FLAGS "${_dummy_no_unused_flag}")
+endif()
+
 # Add option to control whether graphics will be enabled.
 option(GRAPHICS "Build with graphics enabled" OFF)
 
