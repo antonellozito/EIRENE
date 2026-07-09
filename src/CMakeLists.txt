@@ -529,6 +529,12 @@ if(DEFINED ENV{SOLPS_CPP})
       message(STATUS " --  --  Real graphics libraries not found/specified: only")
       message(STATUS " --  --  eirobjx (dummy-graphics executable) will be built.")
       message(STATUS " --  --  Use -DLibGKS=... -DLibGRS=... -DLibX11=... -DLibXt=... -DLibz=... to also build eirobj.")
+      # eirene (eirobj) cannot link without the real graphics libraries.
+      # Exclude it from CMake's default "all" meta-target so a plain build
+      # (and CI, which never provides -DLibGKS=...) does not attempt to
+      # link it and fail; it remains buildable on request via
+      # "cmake --build . --target eirene" once the libraries are supplied.
+      set_target_properties(eirene PROPERTIES EXCLUDE_FROM_ALL TRUE)
     endif()
 
   else()
