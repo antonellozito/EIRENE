@@ -371,6 +371,8 @@ if("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU" OR
 elseif("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "Intel" OR
        "${CMAKE_Fortran_COMPILER_ID}" STREQUAL "IntelLLVM")
   set(_dummy_no_unused_flag "-warn nounused")
+elseif("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "NAG")
+  set(_dummy_no_unused_flag "-w=uda")
 endif()
 if(_dummy_no_unused_flag)
   set_source_files_properties(
