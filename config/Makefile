@@ -578,7 +578,7 @@ ifneq (${MOD},o)
 	@echo '# 5b' >> ${OBJDIR}/dependencies
 endif
 
-listobj: DIMENSIONS ${SRCDIR}/assistant/version.f local
+listobj: DIMENSIONS ${SRCDIR}/assistant/version.f local | $(OBJDIR)
 	@rm -f ${OBJDIR}/LISTOBJ ; touch ${OBJDIR}/LISTOBJ ; l="OBJS =" ; \
 	for d in `echo "$(FPATH)" | tr : \ `; do \
 		l="$$l `(cd $$d > /dev/null; echo *.f)`"; \
@@ -693,7 +693,7 @@ ${SRCEIR}/Database/METHANE:
 ${SRCEIR}/Database/METHAN: ${SRCEIR}/Database/METHANE
 	-ln -s ${SRCEIR}/Database/METHANE ${SRCEIR}/Database/METHAN
 
-${OBJDIR}/mpiversion.mk: ${MAKES}
+${OBJDIR}/mpiversion.mk: ${MAKES} | $(OBJDIR)
 ifdef NO_MPI
 	echo 'MPI_VERSION=0' > ${OBJDIR}/mpiversion.mk
 else
