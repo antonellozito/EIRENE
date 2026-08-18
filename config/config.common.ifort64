@@ -54,7 +54,7 @@ ifndef COMPILER_REDEF
    LPOPTS += -fiopenmp
   else
    ifeq ($(shell test ${COMPILER_MAJOR_VERSION} -ge 15; echo $$?),0)
-    FCOPTS += -qopenmp
+    FCOPTS += -qopenmp -qopenmp-threadprivate=compat
     LDOPTS += -qopenmp
    else
     FCOPTS += -openmp
