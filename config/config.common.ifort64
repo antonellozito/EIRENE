@@ -69,6 +69,11 @@ ifndef COMPILER_REDEF
    COPTS  += -Rno-debug-disables-optimization
   endif
  endif
+ ifeq ($(shell test ${COMPILER_MAJOR_VERSION} -ge 2023; echo $$?),0)
+  FCOPTS += -mprefer-vector-width=512
+ else
+  FCOPTS += -qopt-zmm-usage=high
+ endif
  ifeq ($(shell test ${COMPILER_MAJOR_VERSION} -ge 15; echo $$?),0)
   FCOPTS += -fp-model=precise
  endif

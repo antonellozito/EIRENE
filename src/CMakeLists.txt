@@ -17,10 +17,10 @@ endif()
 
 # Adds compiler flags to all build types.
 if("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "Intel")
-  set(CMAKE_Fortran_FLAGS_RELEASE "-fp-model source -fpp")
+  set(CMAKE_Fortran_FLAGS_RELEASE "-fp-model source -fpp -O3 -qopt-zmm-usage=high")
   set(CMAKE_Fortran_FLAGS_DEBUG "-g -fpp -gen-interfaces -warn all,interfaces -check all -traceback -fpe0 -diag-disable:10182")
 elseif("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "IntelLLVM")
-  set(CMAKE_Fortran_FLAGS_RELEASE "-fp-model source -fpp")
+  set(CMAKE_Fortran_FLAGS_RELEASE "-fp-model source -fpp -O3 -mprefer-vector-width=512")
   set(CMAKE_Fortran_FLAGS_DEBUG "-g -fpp -gen-interfaces -warn all,interfaces -check all,nouninit -traceback -fpe0 -diag-disable:10182,10440")
   string(APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG "-check all,nouninit")
 elseif("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU")
