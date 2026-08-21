@@ -4854,7 +4854,7 @@ csw mpi 07apr2010
       SUBROUTINE EIRENE_BROADCAST_INFCOP
       IMPLICIT NONE
       integer :: ier
-#ifdef USE_MPI
+#if( defined(USE_MPI) && !defined(OPEN_MPI) && !defined(GFORTRAN) && !defined(CRAY) )
       external :: mpi_bcast
 #endif
 
@@ -4931,7 +4931,7 @@ csw mpi 09jun2010
       implicit none
       integer :: ifl, istrx, ier
       real(dp), allocatable :: dumvec(:)
-#ifdef USE_MPI
+#if ( defined(USE_MPI) && !defined(OPEN_MPI) && !defined(GFORTRAN) && !defined(CRAY) )
       external :: mpi_bcast
 #endif
 
@@ -5018,7 +5018,7 @@ csw mpi 09jun2010
       integer, intent(in) :: istrr, irank
       integer ier
       real(dp), allocatable :: dumvec(:)
-#ifdef USE_MPI
+#if ( defined(USE_MPI) && !defined(OPEN_MPI) && !defined(GFORTRAN) && !defined(CRAY) )
       external :: mpi_recv
 #endif
 
@@ -5202,7 +5202,7 @@ cdjm Jan2017
       integer, intent(in) :: istrr, irank
       integer :: ier
       real(dp), allocatable :: dumvec(:)
-#ifdef USE_MPI
+#if ( defined(USE_MPI) && !defined(OPEN_MPI) && !defined(GFORTRAN) && !defined(CRAY) )
       external :: mpi_send
 #endif
 
