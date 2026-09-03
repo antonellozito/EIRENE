@@ -257,6 +257,7 @@ C
       USE EIRMOD_CPOLYG
       USE EIRMOD_CGEOM
       USE EIRMOD_CINIT
+      USE EIRMOD_CCOUPL,ONLY:NNISO,NNCUT,NXISO1,NXISO2,NYISO1,NYISO2
       USE EIRMOD_COMPRT,ONLY:IUNOUT
       IMPLICIT NONE
 C
@@ -271,10 +272,9 @@ C  GEOMETRY DATA: CELL VERTICES (LINDA ---> EIRENE)
 C
       CHARACTER(80) :: LINE
 C   DIMENSIONIERUNG FUER GITTER
-      INTEGER :: DIMXH,DIMYH,NNCUT,NNISO
+      INTEGER :: DIMXH,DIMYH
       INTEGER, ALLOCATABLE ::
-     1 NXCUT1(:),NXCUT2(:),NYCUT1(:),NYCUT2(:),
-     2 NXISO1(:),NXISO2(:),NYISO1(:),NYISO2(:)
+     1 NXCUT1(:),NXCUT2(:),NYCUT1(:),NYCUT2(:)
       INTEGER :: IX, IY, I, J, NP, NWISO
 
       character*54 format_string(2)
@@ -304,30 +304,39 @@ C        PARAMETER DIMXH,DIMYH                        RFS 14.5.1991
         read (30,'(A80)') LINE
         i = verify(line,' ')
         if (i /= 0) then
-           backspace 30
-           exit
+          backspace 30
+          exit
         end if
       end do
 
       read(30,*,ERR=100,END=100) dimxh,dimyh,nncut
       allocate(nxcut1(0:nncut),nxcut2(0:nncut),
      .         nycut1(0:nncut),nycut2(0:nncut))
+      nxcut1=0
+      nxcut2=0
+      nycut1=0
+      nycut2=0
       read(30,*,ERR=100,END=100)
-     r     (nxcut1(i),nxcut2(i),nycut1(i),nycut2(i),i=1,nncut)
-      if (nncut.gt.2) then
-         read(30,*,ERR=100,END=100) nniso
-         allocate(nxiso1(0:nniso),nxiso2(0:nniso),
-     .            nyiso1(0:nniso),nyiso2(0:nniso))
-         read(30,*,ERR=100,END=100)
-     r            (nxiso1(i),nxiso2(i),nyiso1(i),nyiso2(i),i=1,nniso)
+     r        (nxcut1(i),nxcut2(i),nycut1(i),nycut2(i),i=1,nncut)
+      read(30,'(A80)',ERR=100,END=100) line
+      if (scan(line,'123456789').gt.0) then
+        read(line,*) nniso
+        allocate(nxiso1(0:nniso),nxiso2(0:nniso),
+     .           nyiso1(0:nniso),nyiso2(0:nniso))
+        nxiso1=0
+        nxiso2=0
+        nyiso1=0
+        nyiso2=0
+        read(30,*,ERR=100,END=100)
+     r          (nxiso1(i),nxiso2(i),nyiso1(i),nyiso2(i),i=1,nniso)
+        read(30,*,ERR=100,END=100)
       ELSE
-       NNISO=0 !VK
+        NNISO=0 !VK
       endif
-      read(30,*,ERR=100,END=100)
 C    ANZAHL DER TEILSTUECKE PRO POLYGON
       NPLP = MAX((NNCUT/2)*3,1)
 C    COMPUTE WIDTH OF INSULATING CUT FOR DOUBLE NULL
-      IF (NNISO.GE.1) THEN
+      IF (NNISO.GE.1.AND.NNCUT.GT.2) THEN
         NWISO=NXISO2(1)-NXISO1(1)
       ELSE
         NWISO=0
@@ -340,7 +349,7 @@ C     PRINT MESSAGE AND CHECK
         WRITE(IUNOUT,*) "WARNING FROM GEOMD: UNKNOWN TOPOLOGY"
         WRITE(IUNOUT,*) " NNCUT ",NNCUT
       END IF
-      IF(NNCUT.EQ.4.AND.NNISO.NE.1) THEN
+      IF(NNCUT.EQ.4.AND.NNISO.LT.1) THEN
         WRITE(IUNOUT,*) "WARNING FROM GEOMD: UNKNOWN TOPOLOGY"
         WRITE(IUNOUT,*) " NNCUT, NNISO ",NNCUT,NNISO
       END IF
@@ -1495,8 +1504,6 @@ C
   910 FORMAT(5(ES16.7E3))
 *//END NEUTR//
       END SUBROUTINE EIRENE_NEUTR
-
-
 
 
       SUBROUTINE EIRENE_SAVE_TALLIES (ISTRAI)
