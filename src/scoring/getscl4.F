@@ -484,6 +484,8 @@ C  and use a 2x2 matrix instead.
             END DO
 
             I3 = 6 - I1 - I2
+            FFC(I1) = 1._DP
+            FFC(I2) = 1._DP
             FFC(I3) = 1._DP
 
             DTA=PP(J1,I1)*PP(J2,I2)-PP(J2,I1)*PP(J1,I2)
