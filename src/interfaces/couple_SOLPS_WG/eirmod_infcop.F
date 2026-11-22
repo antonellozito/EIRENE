@@ -4888,6 +4888,10 @@ csw mpi 07apr2010
      .               0,MPI_COMM_WORLD,ier)
       call mpi_bcast(puy,ncvp,MPI_DOUBLE_PRECISION,
      .               0,MPI_COMM_WORLD,ier)
+      call mpi_bcast(pvx,ncvp,MPI_DOUBLE_PRECISION,
+     .               0,MPI_COMM_WORLD,ier)
+      call mpi_bcast(pvy,ncvp,MPI_DOUBLE_PRECISION,
+     .               0,MPI_COMM_WORLD,ier)
 #ifdef WG_RM
       call mpi_bcast(puxe,nrad,MPI_DOUBLE_PRECISION,
      .               0,MPI_COMM_WORLD,ier)
@@ -4896,10 +4900,6 @@ csw mpi 07apr2010
       call mpi_bcast(puxn,nrad,MPI_DOUBLE_PRECISION,
      .               0,MPI_COMM_WORLD,ier)
       call mpi_bcast(puyn,nrad,MPI_DOUBLE_PRECISION,
-     .               0,MPI_COMM_WORLD,ier)
-      call mpi_bcast(pvx,nrad,MPI_DOUBLE_PRECISION,
-     .               0,MPI_COMM_WORLD,ier)
-      call mpi_bcast(pvy,nrad,MPI_DOUBLE_PRECISION,
      .               0,MPI_COMM_WORLD,ier)
       call mpi_bcast(pvxe,nrad,MPI_DOUBLE_PRECISION,
      .               0,MPI_COMM_WORLD,ier)
