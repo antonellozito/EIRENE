@@ -32,6 +32,7 @@ C
       USE EIRMOD_CPOLYG
       USE EIRMOD_CZT1
       USE EIRMOD_CTRIG
+      USE EIRMOD_CGEOM, ONLY: NCLTAL
       use eirmod_extrab25
 
       IMPLICIT NONE
@@ -41,7 +42,8 @@ C
 CDR
       REAL(DP), ALLOCATABLE, SAVE :: VPX(:),VPY(:),VRX(:),VRY(:)
 CDR
-      INTEGER :: I, IRD
+C  IRD: GEOMETRY CELL OF THE TRACK (UNIT VECTORS), ICL: ITS SCORING CELL
+      INTEGER :: I, IRD, ICL
       INTEGER, SAVE :: IFIRST, IA0, IA1, IA2, IA3, IA4
       integer :: icou
       real(dp) :: wtr,vr,vp,dist
@@ -117,6 +119,7 @@ C  ATOMS
           DIST=CLPD(ICOU)
           WTR=WV*DIST
           IRD=NRCELL+NUPC(ICOU)*NR1ST+NBLCKA
+          ICL=NCLTAL(IRD)
 C
 cdr       IF (LGVAC(IRD,0)) GOTO 20   ! score neutral fluxes also in Vac. region !
 C
@@ -127,24 +130,24 @@ C  particle current, radial component  (CM/SEC)
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(IA0+IATM,IRD)=ADDV(IA0+IATM,IRD)+WTR*VR
+          ADDV(IA0+IATM,ICL)=ADDV(IA0+IATM,ICL)+WTR*VR
           if(ia1+iatm.gt.nadv) goto 20
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(IA1+IATM,IRD)=ADDV(IA1+IATM,IRD)+WTR*VR*E0
+          ADDV(IA1+IATM,ICL)=ADDV(IA1+IATM,ICL)+WTR*VR*E0
 C  particle current, poloidal component (CM/SEC)
           VP=(VELX*VPX(IRD)+VELY*VPY(IRD))*VEL
           if(ia2+iatm.gt.nadv) goto 20
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(IA2+IATM,IRD)=ADDV(IA2+IATM,IRD)+WTR*VP
+          ADDV(IA2+IATM,ICL)=ADDV(IA2+IATM,ICL)+WTR*VP
           if(ia3+iatm.gt.nadv) goto 20
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(IA3+IATM,IRD)=ADDV(IA3+IATM,IRD)+WTR*VP*E0
+          ADDV(IA3+IATM,ICL)=ADDV(IA3+IATM,ICL)+WTR*VP*E0
 
 c  particle current: toroidal component (cm/sec)
 c    can be found from default tallies: vden_xzy scalar product bxin,....bzin
@@ -155,7 +158,7 @@ C  particle flux, integrated over all directions
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(IA4+IATM,IRD)=ADDV(IA4+IATM,IRD)+WTR*VEL
+          ADDV(IA4+IATM,ICL)=ADDV(IA4+IATM,ICL)+WTR*VEL
 CDR
    20   CONTINUE
 C
@@ -166,6 +169,7 @@ CDR
           DIST=CLPD(ICOU)
           WTR=WV*DIST
           IRD=NRCELL+NUPC(ICOU)*NR1ST+NBLCKA
+          ICL=NCLTAL(IRD)
 C
           IF (LGVAC(IRD,0)) GOTO 200
 C  particle current, radial component  (CM/SEC)
@@ -174,24 +178,24 @@ C  particle current, radial component  (CM/SEC)
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(NATMI+IMOL,IRD)=ADDV(NATMI+IMOL,IRD)+WTR*VR
+          ADDV(NATMI+IMOL,ICL)=ADDV(NATMI+IMOL,ICL)+WTR*VR
           if(ia1+natmi+imol.gt.nadv) goto 200
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(IA1+NATMI+IMOL,IRD)=ADDV(IA1+NATMI+IMOL,IRD)+WTR*VR*E0
+          ADDV(IA1+NATMI+IMOL,ICL)=ADDV(IA1+NATMI+IMOL,ICL)+WTR*VR*E0
 C  particle current, poloidal component (CM/SEC)
           VP=(VELX*VPX(IRD)+VELY*VPY(IRD))*VEL
           if(ia2+natmi+imol.gt.nadv) goto 200
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(IA2+NATMI+IMOL,IRD)=ADDV(IA2+NATMI+IMOL,IRD)+WTR*VP
+          ADDV(IA2+NATMI+IMOL,ICL)=ADDV(IA2+NATMI+IMOL,ICL)+WTR*VP
           if(ia3+natmi+imol.gt.nadv) goto 200
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(IA3+NATMI+IMOL,IRD)=ADDV(IA3+NATMI+IMOL,IRD)+WTR*VP*E0
+          ADDV(IA3+NATMI+IMOL,ICL)=ADDV(IA3+NATMI+IMOL,ICL)+WTR*VP*E0
 
 c  particle current: toroidal component (cm/sec)
 c    can be found from default tallies: vden_xzy scalar product bxin,....bzin
@@ -204,7 +208,7 @@ C  particle flux, integrated over all directions
 #if ( defined(USE_OPENMP) || defined(USE_EXT_OPENMP) )
 !$OMP ATOMIC
 #endif
-          ADDV(IA4+NATMI+IMOL,IRD)=ADDV(IA4+NATMI+IMOL,IRD)+WTR*VEL
+          ADDV(IA4+NATMI+IMOL,ICL)=ADDV(IA4+NATMI+IMOL,ICL)+WTR*VEL
 C
   200   CONTINUE
 CDR
