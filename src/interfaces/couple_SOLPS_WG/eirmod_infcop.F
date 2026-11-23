@@ -217,9 +217,11 @@ c volumetric primary source tallies,
 c while default eirene tallies pppl, mppl, eppl and epel would be
 c the corresponding tallies scored from random sampling in eirene
 c Aug 22: ...both: mppl and epel tallies do not exist so far.
+c erec_cop is the radiated part of epel_cop, i.e. epel_cop without
+c the potential energy given back to the electrons
       REAL(DP), ALLOCATABLE, SAVE ::
      .            PPPL_COP(:,:), MPPL_COP(:,:),
-     .            EPPL_COP(:,:), EPEL_COP(:)
+     .            EPPL_COP(:,:), EPEL_COP(:), EREC_COP(:)
 C
 c  for short cycle correction terms, in vol. rec. strata.
       REAL(DP), ALLOCATABLE, SAVE ::
@@ -312,6 +314,7 @@ cdr  Always needed for vol rec strata. Not only for short cycle
         ALLOCATE (MPPL_COP(3*NPLS,NRAD))
         ALLOCATE (EPPL_COP(NPLS,NRAD))
         ALLOCATE (EPEL_COP(NRAD))
+        ALLOCATE (EREC_COP(NRAD))
 
 cdr  for short cycle only. Obsolete
         ALLOCATE (PPLODA(NPLS,NRAD))
@@ -2417,6 +2420,7 @@ C
      .          RECADD, RECTOT, PIADD_VEC(0:2),
      .          PRESS00, SNICL, FLX_EIR,
      .          EAMISUM, EEADD, EIADD, CHE, CHI, CHP, CHEES, CHEIS
+      REAL(DP) :: DELREC
 C
       logical :: lhit(nrad)
       INTEGER :: I, JATM, JMOL, JION, JPLS, IPLSV, IPLSTI, ISTRAI,
@@ -2508,6 +2512,7 @@ cdr  Always needed for vol. rec. strata. Not only for short cycle
         ALLOCATE (MPPL_COP(3*NPLS,NRAD))
         ALLOCATE (EPPL_COP(NPLS,NRAD))
         ALLOCATE (EPEL_COP(NRAD))
+        ALLOCATE (EREC_COP(NRAD))
 cdr  next 4: for short cycle. Obsolete
         ALLOCATE (PPLODA(NPLS,NRAD))
         ALLOCATE (MPLODA(3*NPLS,NRAD))
@@ -3078,6 +3083,7 @@ C
         MPPL_COP = 0.D0
         EPPL_COP = 0.D0
         EPEL_COP = 0.D0
+        EREC_COP = 0.D0
 
         IF (NLVOL(ISTRAI).AND.NLPLS(ISTRAI)) THEN
 C
@@ -3090,6 +3096,10 @@ cdr  only one bulk ion species per volume source stratum supported
           IPLSTI = MPLSTI(IPLS)
           DO 7472 IIRC=1,NPRCI(IPLS)
             IRRC=LGPRC(IPLS,IIRC)
+C  POTENTIAL ENERGY PER RECOMBINATION INCLUDED IN EELRC1 (SEE XSECTP
+C  AND FEELRC1): THE REST OF EELRC1 IS RADIATED
+            DELREC=0._DP
+            IF (NELRRC(IRRC) > 0) DELREC=DELPOT(NELRRC(IRRC))
             SUMN=0.0
             SUMM_VEC(0:2)=0.0
             SUMEI=0.0
@@ -3130,6 +3140,9 @@ cdr  mppl_cop is a vectorial tally: par., perp., and diamagn. component
                 ENDDO
                 EPPL_COP(IPLS,INC)=EPPL_COP(IPLS,INC)+EIADD
                 EPEL_COP(INC)=EPEL_COP(INC)+EEADD
+C  RECADD = -TABRC1*DIIN*ELCHA, HENCE THE RADIATED PART IS
+C  EEADD - DELREC*TABRC1*DIIN*ELCHA = EEADD + DELREC*RECADD
+                EREC_COP(INC)=EREC_COP(INC)+EEADD+DELREC*RECADD
                 lhit(inc) = .true.
               end if
 
@@ -3175,6 +3188,7 @@ C  BECAUSE ALSO PAPL,.... ARE SCALED LIKE THIS
           MPPL_COP=MPPL_COP*SUMN_OLD/RECTOT
           EPPL_COP=EPPL_COP*SUMN_OLD/RECTOT
           EPEL_COP=EPEL_COP*SUMN_OLD/RECTOT
+          EREC_COP=EREC_COP*SUMN_OLD/RECTOT
 
 C  RESCALE SOURCES FOR B2 (PPPL_COP,PAPL,....) TO NEW SOURCE STRENGTH
           FLXEIR(ISTRAI)=RECTOT/SUMN_OLD
@@ -3244,6 +3258,13 @@ csw 26jan2011 extra B25
 csw 08mar2013 moved to here, i.e. after correction from volume recombination
         if(.not. lshort) then
           call eirene_wneutrals_fill(istrai)
+C  POWER RADIATED BY THE VOLUME RECOMBINATION OF THIS STRATUM
+          IF (NLVOL(ISTRAI).AND.NLPLS(ISTRAI)) THEN
+            IPLS=NSPEZ(ISTRAI)
+            DO IN=1,NCIP
+              ERECRAD(IN,IPLS,ISTRAI)=EREC_COP(IN)*VOLTAL(IN)
+            END DO
+          END IF
         endif
 csw
         IF (.NOT.LSYMET) GOTO 7500
@@ -5615,6 +5636,7 @@ c
         DEALLOCATE (MPPL_COP)
         DEALLOCATE (EPPL_COP)
         DEALLOCATE (EPEL_COP)
+        DEALLOCATE (EREC_COP)
 
         DEALLOCATE (PPLODA)
         DEALLOCATE (MPLODA)
