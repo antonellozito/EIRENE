@@ -88,7 +88,7 @@
       integer, public, save :: ini_iniusr=0
 
       !format flags for output files
-      integer, public, save :: jvft44=20260128, jvft46=20170930
+      integer, public, save :: jvft44=20261122, jvft46=20170930
 
       !names for atoms
       character*8, save, public, allocatable :: texta(:)
@@ -458,6 +458,12 @@
         call write_title(44,'edeni_int_b2',(nstrai+1)*nion)
         WRITE(44,'(1p,6e15.7)') ((EDENI_INT_B2(I,J),I=1,NION),J=0,NSTRAI)
 
+      !c*** from 20261122 on:
+        if (jvft44.ge.20261122) then
+          call write_title(44,'erecrad',n2*nfla)
+          call eirene_neutr(44,ncvp,nfla,erecrad,ncvp,npls,1,1)
+        end if
+
       else  ! Run with no triangular mesh
       !c*** from 20071209 on:
         call write_title(44,'eneutrad',n2*natmi)
@@ -470,6 +476,11 @@
         if (nioni.gt.0) then
           call write_title(44,'eionrad',n2*nioni)
           call eirene_neutr(44,ncvp,nioni,eionrad,ncvp,nion,1,1)
+        end if
+      !c*** from 20261122 on:
+        if (jvft44.ge.20261122) then
+          call write_title(44,'erecrad',n2*nfla)
+          call eirene_neutr(44,ncvp,nfla,erecrad,ncvp,npls,1,1)
         end if
       endif ! NLWRMSH
       rewind (44)
