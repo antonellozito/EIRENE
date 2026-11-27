@@ -36,6 +36,7 @@
       public :: eirene_wneutrals_reduce
       public :: eirene_wneutrals_dealloc
       public :: eirene_wneutrals_alloc_arrays
+      public :: wlstra_field, wlstra_res, wlstra_ready
 
 ! eirdiag.h/eirdiag.f
 !c*** Volume data:
@@ -120,7 +121,35 @@
                            !for each type of emitted atom
      ,  wldsptm_res(:,:),  !sputtered flux
                            !for each type of emitted molecule
-     ,  wlpump_res(:,:)    !pumped flux
+     ,  wlpump_res(:,:),   !pumped flux
+     ,  wldra_res(:,:),    !reflected atom flux
+     ,  wldrm_res(:,:),    !reflected molecule flux
+     ,  wldpa_res(:,:),    !atom flux released by the plasma ions
+     ,  wldpm_res(:,:)     !molecule flux released by the plasma ions
+
+      !c*** wlstra(:,k): fields of stratum k (k=0: of all the strata),
+      !c*** written to fort.44 from 20261126: the resolved fields above
+      !c*** of the stratum (wlpump_res without the bulk ions), then on
+      !c*** every surface (as wlpump) the energy carried away by the
+      !c*** re-emitted atoms and molecules (as ewldea_res, ewldem_res),
+      !c*** the recombination energy of the molecules formed there (as
+      !c*** ewldmr_res) and the pumped flux of the atoms, molecules and
+      !c*** test ions (as wlpump). Field n: name wlstra_name(n), kind
+      !c*** wlstra_kind(n) (1 atoms, 2 molecules, 3 test ions, 0 one
+      !c*** value), the first nwlstra_res resolved; see wlstra_field
+      real(DP), save, allocatable, public :: wlstra(:,:)
+      integer, parameter, public :: nwlstra=25, nwlstra_res=19,
+     ,  nwlstra_new=16          ! the first field without a total above
+      character(len=12), parameter, public :: wlstra_name(nwlstra) = (/
+     ,  'wldna_res   ','wldnm_res   ','ewlda_res   ','ewldm_res   ',
+     ,  'ewldea_res  ','ewldem_res  ','ewldrp_res  ','ewldmr_res  ',
+     ,  'wldspt_res  ','wldspta_res ','wldsptm_res ','wlpump_res(A',
+     ,  'wlpump_res(M','wlpump_res(I','ewldt_res   ','wldra_res   ',
+     ,  'wldrm_res   ','wldpa_res   ','wldpm_res   ','ewldea      ',
+     ,  'ewldem      ','ewldmr      ','wlpump(A    ','wlpump(M    ',
+     ,  'wlpump(I    ' /)
+      integer, parameter, public :: wlstra_kind(nwlstra) = (/
+     ,  1,2,1,2,1,2,0,2,0,1,2,1,2,3,0,1,2,1,2,1,2,2,1,2,3 /)
 
       !c*** dissociation energy of the hydrogen molecule
       real(DP), parameter, public :: diss_pot_H2=4.48_DP
@@ -654,6 +683,9 @@ C     READ IN THE NUMBER OF TRIANGLES
       end do
       !c
       call update_integrals(istra)
+      !c*** the fields of this stratum (wlstra)
+      call wneutral_fluxes
+      call wlstra_store(istra)
 
       !c---------------------------------------------------------------<
       istra=istra_save
@@ -694,6 +726,7 @@ C     READ IN THE NUMBER OF TRIANGLES
             emolrad(:,:,k) = 0.0_DP
             eionrad(:,:,k) = 0.0_DP
             erecrad(:,:,k) = 0.0_DP
+            if (allocated(wlstra)) wlstra(:,k) = 0.0_DP
             edissml(:,:,k) = 0.0_DP
             wldnek_aver(:,k) = 0.0_DP
             wldnep_aver(:,k) = 0.0_DP
@@ -982,6 +1015,7 @@ C     READ IN THE NUMBER OF TRIANGLES
       call eirene_leer(1)
 
       CALL WNEUTRAL_FLUXES !VK
+      call wlstra_store(0)
 !carlis printout of pumped and sputtered flux for energy balance script
       WRITE(IUNOUT,*) "PUMPED FLUX:",pumpsum
       WRITE(IUNOUT,*) "SPUTTERED FLUX:",sptsum
@@ -1036,6 +1070,7 @@ C     READ IN THE NUMBER OF TRIANGLES
           emolrad=0.0_DP
           eionrad=0.0_DP
           erecrad=0.0_DP
+          if (allocated(wlstra)) wlstra=0.0_DP
           pdena_int=0.0_DP
           pdena_int_b2=0.0_DP
           pdenm_int=0.0_DP
@@ -1130,8 +1165,10 @@ C     READ IN THE NUMBER OF TRIANGLES
      &             ewlda_res, ewldm_res, ewldt_res,
      &             ewldea_res, ewldem_res,
      &             wldspt_res, wldspta_res,
-     &             wlpump_res, sarea_res)
+     &             wlpump_res, sarea_res,
+     &             wldra_res, wldrm_res, wldpa_res, wldpm_res)
       end if
+      if(allocated(wlstra)) deallocate(wlstra)
 
       if(allocated(pdena_int))
      > deallocate(pdena_int,pdena_int_b2,pdenm_int,pdenm_int_b2,
@@ -1286,6 +1323,14 @@ C     READ IN THE NUMBER OF TRIANGLES
      &              MPI_DOUBLE_PRECISION, 0, istra, MPI_COMM_WORLD,
      &              ierr)
 
+      if (.not.allocated(wlstra)) then
+        call wneutral_fluxes
+        call wlstra_ready(nstra)
+      end if
+      call mpi_send(wlstra(1,istra) , size(wlstra,1),
+     &              MPI_DOUBLE_PRECISION, 0, istra, MPI_COMM_WORLD,
+     &              ierr)
+
       return
       end subroutine eirene_wneutrals_send
 
@@ -1424,6 +1469,14 @@ C     READ IN THE NUMBER OF TRIANGLES
      &              MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
       call mpi_recv(pdenm_int_b2(:,istra) , size(pdenm_int_b2(:,istra)),
+     &              MPI_DOUBLE_PRECISION, rank, istra,
+     &              MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+      if (.not.allocated(wlstra)) then
+        call wneutral_fluxes
+        call wlstra_ready(nstra)
+      end if
+      call mpi_recv(wlstra(1,istra) , size(wlstra,1),
      &              MPI_DOUBLE_PRECISION, rank, istra,
      &              MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -1589,6 +1642,179 @@ C     READ IN THE NUMBER OF TRIANGLES
       return
       end subroutine eirene_wneutrals_reduce
 
+      !c
+      !c*** wlstra: number of species nsp, of elements nel (resolved
+      !c*** segments or surfaces) and offset off of field n, from the
+      !c*** sizes of the arrays (the _res ones for the resolved fields;
+      !c*** in EIRENE and in B2.5)
+      !c
+      subroutine wlstra_field(n, nsp, nel, off)
+      implicit none
+      integer, intent(in) :: n
+      integer, intent(out) :: nsp, nel, off
+      integer :: m
+      off = 0
+      do m = 1, n
+        if (m.gt.1) off = off+nsp*nel
+        nsp = 1
+        nel = 0
+        if (m.gt.nwlstra_res) then
+          nel = size(wlpump,2)
+          if (wlstra_kind(m).eq.1) nsp = size(wldna,2)
+          if (wlstra_kind(m).eq.2) nsp = size(wldnm,2)
+        else if (allocated(wldna_res)) then
+          nel = size(wldna_res,2)
+          if (wlstra_kind(m).eq.1) nsp = size(wldna_res,1)
+          if (wlstra_kind(m).eq.2) nsp = size(wldnm_res,1)
+        end if
+        if (wlstra_kind(m).eq.3) nsp = size(eionrad,2)
+      end do
+      end subroutine wlstra_field
+
+      !c
+      !c*** wlstra allocated for the layout and nstrata strata (anew if
+      !c*** allocated otherwise, e.g. by B2.5 reading an older fort.44)
+      !c
+      subroutine wlstra_ready(nstrata)
+      implicit none
+      integer, intent(in) :: nstrata
+      integer :: nsp, nel, off
+      call wlstra_field(nwlstra, nsp, nel, off)
+      if (allocated(wlstra)) then
+        if (size(wlstra,1).eq.max(1,off+nsp*nel) .and.
+     .      ubound(wlstra,2).ge.nstrata) return
+        deallocate(wlstra)
+      end if
+      allocate(wlstra(max(1,off+nsp*nel),0:nstrata))
+      wlstra=0.0_DP
+      end subroutine wlstra_ready
+
+      !c
+      !c*** the resolved fields of wlstra(:,k) from (store) or into the
+      !c*** _res arrays
+      !c
+      subroutine wlstra_res(k, store)
+      implicit none
+      integer, intent(in) :: k
+      logical, intent(in) :: store
+      integer :: n, nsp, nel, off, na, nm
+      if (.not.allocated(wldna_res)) return
+      na = size(wldna_res,1)
+      nm = size(wldnm_res,1)
+      do n = 1, nwlstra_res
+        call wlstra_field(n, nsp, nel, off)
+        select case (n)
+        case (1)
+          call copy(wldna_res)
+        case (2)
+          call copy(wldnm_res)
+        case (3)
+          call copy(ewlda_res)
+        case (4)
+          call copy(ewldm_res)
+        case (5)
+          call copy(ewldea_res)
+        case (6)
+          call copy(ewldem_res)
+        case (7)
+          call copy(ewldrp_res)
+        case (8)
+          call copy(ewldmr_res)
+        case (9)
+          call copy(wldspt_res)
+        case (10)
+          call copy(wldspta_res)
+        case (11)
+          call copy(wldsptm_res)
+        case (12)
+          call pump(0)
+        case (13)
+          call pump(na)
+        case (14)
+          call pump(na+nm)
+        case (15)
+          call copy(ewldt_res)
+        case (16)
+          call copy(wldra_res)
+        case (17)
+          call copy(wldrm_res)
+        case (18)
+          call copy(wldpa_res)
+        case (19)
+          call copy(wldpm_res)
+        end select
+      end do
+      contains
+      subroutine copy(a)
+      real(DP) :: a(*)
+      if (store) then
+        wlstra(off+1:off+nsp*nel,k) = a(1:nsp*nel)
+      else
+        a(1:nsp*nel) = wlstra(off+1:off+nsp*nel,k)
+      end if
+      end subroutine copy
+      subroutine pump(j0)
+      integer, intent(in) :: j0
+      integer :: i, j
+      do i = 1, nel
+        do j = 1, nsp
+          if (store) then
+            wlstra(off+j+(i-1)*nsp,k) = wlpump_res(j0+j,i)
+          else
+            wlpump_res(j0+j,i) = wlstra(off+j+(i-1)*nsp,k)
+          end if
+        end do
+      end do
+      end subroutine pump
+      end subroutine wlstra_res
+
+      !c
+      !c*** wlstra(:,k) from the tallies (of stratum k, k=0: summed)
+      !c*** and the resolved fields computed from them (WNEUTRAL_FLUXES)
+      !c
+      subroutine wlstra_store(k)
+      implicit none
+      integer, intent(in) :: k
+      integer :: n, nsp, nel, off, i, j, j0, na, nm
+      real(DP) :: e
+      call wlstra_ready(nstra)
+      call wlstra_res(k, .true.)
+      na = size(wldna,2)
+      nm = size(wldnm,2)
+      do n = nwlstra_res+1, nwlstra
+        call wlstra_field(n, nsp, nel, off)
+        do i = 1, nel
+          do j = 1, nsp
+            e = 0.0_DP
+            select case (n)
+            case (nwlstra_res+1)        ! as ewldea_res
+              if (lerfaat) e = e+erfaat(j,i)
+              if (lerfmat) e = e+erfmat(j,i)
+              if (lerfiat) e = e+erfiat(j,i)
+              if (lerfphat) e = e+erfphat(j,i)
+            case (nwlstra_res+2)        ! as ewldem_res
+              if (lerfaml) e = e+erfaml(j,i)
+              if (lerfmml) e = e+erfmml(j,i)
+              if (lerfiml) e = e+erfiml(j,i)
+              if (lerfphml) e = e+erfphml(j,i)
+            case (nwlstra_res+3)        ! as ewldmr_res
+              if (ncharm(j).eq.2) then
+                if (lprfaml) e = e+prfaml(j,i)
+                if (lprfpml) e = e+prfpml(j,i)
+                e = e*diss_pot_H2
+              end if
+            case default                ! as wlpump
+              j0 = 0
+              if (n.eq.nwlstra_res+5) j0 = na
+              if (n.eq.nwlstra_res+6) j0 = na+nm
+              if (lspump) e = spump(j0+j,i)*hlp_cnv
+            end select
+            wlstra(off+j+(i-1)*nsp,k) = e
+          end do
+        end do
+      end do
+      end subroutine wlstra_store
+
       SUBROUTINE WNEUTRAL_FLUXES
 
       use eirmod_braeir
@@ -1625,6 +1851,10 @@ C ALLOCATES ARRAYS FOR FLUXES
      .           wldspt_res(NCL), sarea_res(NCL),
      .           wldspta_res(NATM,NCL), wldsptm_res(NMOL,NCL),
      .           wlpump_res(NSPZ,NCL) )
+C (B2.5 may have allocated the others reading fort.44: allocated apart)
+       IF(.NOT.ALLOCATED(wldra_res))
+     >  ALLOCATE(wldra_res(NATM,NCL), wldrm_res(NMOL,NCL),
+     .           wldpa_res(NATM,NCL), wldpm_res(NMOL,NCL))
 
 C CALCULATING AREAS OF SURFACE ELEMENTS
        CALL SAREA_INIT
@@ -1738,6 +1968,10 @@ C
       wldspta_res=0._DP
       wldsptm_res=0._DP
       wlpump_res=0._DP
+      wldra_res=0._DP
+      wldrm_res=0._DP
+      wldpa_res=0._DP
+      wldpm_res=0._DP
 
       END SUBROUTINE FLUXES_INIT
 
@@ -1783,6 +2017,12 @@ C
         END IF
         IF (LERFPAT) ewldrp_res(IND)=
      .               ewldrp_res(IND)+ERFPAT(I,ISS)
+        wldra_res(I,IND)= 0._DP
+        IF (LPRFAAT) wldra_res(I,IND)=wldra_res(I,IND)+PRFAAT(I,ISS)
+        IF (LPRFMAT) wldra_res(I,IND)=wldra_res(I,IND)+PRFMAT(I,ISS)
+        IF (LPRFIAT) wldra_res(I,IND)=wldra_res(I,IND)+PRFIAT(I,ISS)
+        wldpa_res(I,IND)= 0._DP
+        IF (LPRFPAT) wldpa_res(I,IND)=PRFPAT(I,ISS)
         wldspta_res(I,IND)= 0._DP
         IF (LSPTAAT) wldspta_res(I,IND)=
      .               wldspta_res(I,IND)+SPTAAT(I,ISS)
@@ -1820,6 +2060,12 @@ C
         END IF
         IF (LERFPML) ewldrp_res(IND)=
      .               ewldrp_res(IND)+ERFPML(I,ISS)
+        wldrm_res(I,IND)= 0._DP
+        IF (LPRFAML) wldrm_res(I,IND)=wldrm_res(I,IND)+PRFAML(I,ISS)
+        IF (LPRFMML) wldrm_res(I,IND)=wldrm_res(I,IND)+PRFMML(I,ISS)
+        IF (LPRFIML) wldrm_res(I,IND)=wldrm_res(I,IND)+PRFIML(I,ISS)
+        wldpm_res(I,IND)= 0._DP
+        IF (LPRFPML) wldpm_res(I,IND)=PRFPML(I,ISS)
         ewldmr_res(I,IND)= 0._DP
         IF (LPRFAML) ewldmr_res(I,IND)=
      .               ewldmr_res(I,IND)+PRFAML(I,ISS)
@@ -2466,6 +2712,10 @@ C UNIT CONVERSION: AMPERE TO S-1
       F_CNV=1./ELCHA
       wldna_res=F_CNV*wldna_res
       wldnm_res=F_CNV*wldnm_res
+      wldra_res=F_CNV*wldra_res
+      wldrm_res=F_CNV*wldrm_res
+      wldpa_res=F_CNV*wldpa_res
+      wldpm_res=F_CNV*wldpm_res
 
 C CALCULATING THE FLUX DENSITIES
       DO ISS=1,NSTS
@@ -2480,6 +2730,8 @@ C CALCULATING THE FLUX DENSITIES
          ewlda_res(I,IS)=ewlda_res(I,IS)/sarea_res(IS)
          ewldea_res(I,IS)=ewldea_res(I,IS)/sarea_res(IS)
          wldspta_res(I,IS)=wldspta_res(I,IS)/sarea_res(IS)
+         wldra_res(I,IS)=wldra_res(I,IS)/sarea_res(IS)
+         wldpa_res(I,IS)=wldpa_res(I,IS)/sarea_res(IS)
         END DO
         DO I=1,NMOL
          wldnm_res(I,IS)=wldnm_res(I,IS)/sarea_res(IS)
@@ -2487,6 +2739,8 @@ C CALCULATING THE FLUX DENSITIES
          ewldem_res(I,IS)=ewldem_res(I,IS)/sarea_res(IS)
          ewldmr_res(I,IS)=ewldmr_res(I,IS)/sarea_res(IS)
          wldsptm_res(I,IS)=wldsptm_res(I,IS)/sarea_res(IS)
+         wldrm_res(I,IS)=wldrm_res(I,IS)/sarea_res(IS)
+         wldpm_res(I,IS)=wldpm_res(I,IS)/sarea_res(IS)
         END DO
         DO I=1,NSPZ
          wlpump_res(I,IS)=wlpump_res(I,IS)/sarea_res(IS)
@@ -2746,6 +3000,10 @@ C INCIDENT ENERGY MINUS REFLECTED ENERGY
           ewldt_res(IR)=ewldt_res(IR)-ERFPHAT(I,MS)
         END IF
         IF (LERFPAT) ewldrp_res(IR)=ewldrp_res(IR)+ERFPAT(I,MS)
+        IF (LPRFAAT) wldra_res(I,IR)=wldra_res(I,IR)+PRFAAT(I,MS)
+        IF (LPRFMAT) wldra_res(I,IR)=wldra_res(I,IR)+PRFMAT(I,MS)
+        IF (LPRFIAT) wldra_res(I,IR)=wldra_res(I,IR)+PRFIAT(I,MS)
+        IF (LPRFPAT) wldpa_res(I,IR)=wldpa_res(I,IR)+PRFPAT(I,MS)
         IF (LSPTAAT) wldspta_res(I,IR)=
      .               wldspta_res(I,IR)+SPTAAT(I,MS)
         IF (LSPTMAT) wldspta_res(I,IR)=
@@ -2780,6 +3038,10 @@ C INCIDENT ENERGY MINUS REFLECTED ENERGY
           ewldt_res(IR)=ewldt_res(IR)-ERFPHML(I,MS)
         END IF
         IF (LERFPML) ewldrp_res(IR)=ewldrp_res(IR)+ERFPML(I,MS)
+        IF (LPRFAML) wldrm_res(I,IR)=wldrm_res(I,IR)+PRFAML(I,MS)
+        IF (LPRFMML) wldrm_res(I,IR)=wldrm_res(I,IR)+PRFMML(I,MS)
+        IF (LPRFIML) wldrm_res(I,IR)=wldrm_res(I,IR)+PRFIML(I,MS)
+        IF (LPRFPML) wldpm_res(I,IR)=wldpm_res(I,IR)+PRFPML(I,MS)
         IF (LPRFAML) THEN
           ewldmr_res(I,IR)=ewldmr_res(I,IR)+PRFAML(I,MS)
           IF (NCHARM(I).EQ.2)

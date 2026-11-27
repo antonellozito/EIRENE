@@ -88,7 +88,7 @@
       integer, public, save :: ini_iniusr=0
 
       !format flags for output files
-      integer, public, save :: jvft44=20261122, jvft46=20170930
+      integer, public, save :: jvft44=20261126, jvft46=20170930
 
       !names for atoms
       character*8, save, public, allocatable :: texta(:)
@@ -463,6 +463,8 @@
           call write_title(44,'erecrad',n2*nfla)
           call eirene_neutr(44,ncvp,nfla,erecrad,ncvp,npls,1,1)
         end if
+      !c*** from 20261126 on: the fields by stratum
+        if (jvft44.ge.20261126) call write_wlstra(44)
 
       else  ! Run with no triangular mesh
       !c*** from 20071209 on:
@@ -2208,6 +2210,47 @@
        & '*eirene data field ',trim(titel),' with size ',nsize
       return
       end subroutine write_title
+
+      !c*** the fields of each stratum k (wlstra of eirmod_wneutrals),
+      !c*** titled <name>(<k>), or <name>(<group>,<k>), and the totals of
+      !c*** the fields from nwlstra_new not given above (<name>, or
+      !c*** <name>(0) for those on the surfaces); the resolved ones (none
+      !c*** without resolved surfaces) as the _res fields, the others on
+      !c*** the surfaces of wlpump, species fastest
+      subroutine write_wlstra(kard)
+      integer, intent(in) :: kard
+      integer :: k, n, nsp, nel, off, i, j
+      character*3 :: stnum
+      character*40 :: title
+      call wlstra_ready(nstra)
+      do k = 0, nstrai
+        write (stnum,'(i3)') k
+        do n = 1, nwlstra
+          if (k.eq.0 .and. (n.lt.nwlstra_new .or. &
+     &        n.gt.nwlstra_res+3)) cycle
+          call wlstra_field(n, nsp, nel, off)
+          if (nel.eq.0) cycle
+          if (k.eq.0 .and. n.le.nwlstra_res) then
+            title = wlstra_name(n)
+          else if (k.eq.0) then
+            title = trim(wlstra_name(n))//'(0)'
+          else if (index(wlstra_name(n),'(').gt.0) then
+            title = trim(wlstra_name(n))//','//stnum//')'
+          else
+            title = trim(wlstra_name(n))//'('//stnum//')'
+          end if
+          if (n.le.nwlstra_res) then
+            call write_title(kard,title,nsp*nel)
+            write(kard,'(1p,6e15.7)') wlstra(off+1:off+nsp*nel,k)
+          else
+            call write_title(kard,title,nsp*(nnlimi+nnstsi))
+            write(kard,'(1p,6e15.7)') &
+     &        ((wlstra(off+j+(i-1)*nsp,k),j=1,nsp),i=1,nnlimi), &
+     &        ((wlstra(off+j+(nlim+i-1)*nsp,k),j=1,nsp),i=1,nnstsi)
+          end if
+        end do
+      end do
+      end subroutine write_wlstra
 
 
       subroutine eirene_extrab25_emissivity
